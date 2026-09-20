@@ -1,0 +1,3 @@
+# Solo el cálculo numérico de autovalores/autovectores usa NumPy.
+# Verificado con NumPy 2.3.5; el resto del motor usa la biblioteca estándar.
+numpy>=1.26,<3

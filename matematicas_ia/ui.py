@@ -55,15 +55,22 @@ class Application(tk.Tk):
     def _layout(self):
         self.columnconfigure(1, weight=1)
         self.rowconfigure(0, weight=1)
-        sidebar = tk.Frame(self, bg=NAV, width=252)
+        sidebar = tk.Frame(self, bg=NAV, width=282)
         sidebar.grid(row=0, column=0, sticky="nsew")
         sidebar.grid_propagate(False)
         sidebar.columnconfigure(0, weight=1)
         sidebar.rowconfigure(2, weight=1)
         tk.Label(sidebar, text="ÁLGEBRA / IA", bg=NAV, fg="white", font=("Segoe UI", 21, "bold"), anchor="w").grid(row=0, column=0, sticky="ew", padx=20, pady=(25, 4))
         tk.Label(sidebar, text="LABORATORIO DE APRENDIZAJE", bg=NAV, fg="#8eb8c9", font=("Segoe UI", 8, "bold"), anchor="w").grid(row=1, column=0, sticky="ew", padx=21, pady=(0, 20))
-        self.tree = ttk.Treeview(sidebar, show="tree", selectmode="browse", style="Nav.Treeview", takefocus=True)
-        self.tree.grid(row=2, column=0, sticky="nsew", padx=8)
+        navigation = tk.Frame(sidebar, bg=NAV)
+        navigation.grid(row=2, column=0, sticky="nsew", padx=8)
+        navigation.columnconfigure(0, weight=1)
+        navigation.rowconfigure(0, weight=1)
+        self.tree = ttk.Treeview(navigation, show="tree", selectmode="browse", style="Nav.Treeview", takefocus=True)
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        nav_scroll = ttk.Scrollbar(navigation, orient="vertical", command=self.tree.yview)
+        nav_scroll.grid(row=0, column=1, sticky="ns")
+        self.tree.configure(yscrollcommand=nav_scroll.set)
         for index, group in enumerate(dict.fromkeys(lesson.group for lesson in LESSONS), 1):
             self.tree.insert("", "end", iid=group, text=f"{index:02d}   {group.upper()}", open=True, tags=("group",))
             for lesson in LESSONS:
@@ -80,6 +87,7 @@ class Application(tk.Tk):
         self.section.grid(row=0, column=0, sticky="w")
         self.heading = ttk.Label(body, style="Title.TLabel")
         self.heading.grid(row=1, column=0, sticky="w", pady=(4, 15))
+        body.bind("<Configure>", lambda event: self.heading.configure(wraplength=max(350, event.width-52)))
         intro = ttk.Frame(body, style="Card.TFrame", padding=16)
         intro.grid(row=2, column=0, sticky="ew", pady=(0, 18))
         intro.columnconfigure(0, weight=1)
@@ -172,6 +180,7 @@ class Application(tk.Tk):
         if self.lesson == lesson:
             return
         self.lesson = lesson
+        self.tree.see(lesson.id)
         self.section.configure(text=f"{lesson.group.upper()}   /   COMPRENDE → CALCULA → APLICA")
         self.heading.configure(text=lesson.title)
         self.formula.configure(text=lesson.formula)
@@ -219,7 +228,7 @@ class Application(tk.Tk):
     def _reset_output(self):
         self.last_report = None
         self.export_button.configure(state="disabled")
-        self._write(self.result_text, [("Tu próximo descubrimiento", "title"), ("Introduce los valores y pulsa «Calcular y comprender». Aquí verás el resultado y cómo interpretarlo.", ""), ("Atajo: Ctrl + Enter para calcular.", ""), ("Los cálculos racionales se muestran como fracciones exactas. Las raíces no racionales se indican como aproximadas.", "")])
+        self._write(self.result_text, [("Tu próximo descubrimiento", "title"), ("Introduce los valores y pulsa «Calcular y comprender». Aquí verás el resultado y cómo interpretarlo.", ""), ("Atajo: Ctrl + Enter para calcular.", ""), ("Los cálculos racionales se muestran como fracciones exactas. Las raíces no racionales y los pares de autovalor/autovector numéricos se indican como aproximados.", "")])
         self._write(self.steps_text, [("Sigue el procedimiento", "title"), ("Después de calcular aparecerán las operaciones, componente por componente, o los pasos de Gauss–Jordan.", "")])
         self._write(self.context_text, [("¿Dónde se utiliza?", "title"), (self.lesson.scenario, ""), ("Para reflexionar", "heading"), (self.lesson.question, ""), ("Origen del contenido", "heading"), (self.lesson.source, "")])
 

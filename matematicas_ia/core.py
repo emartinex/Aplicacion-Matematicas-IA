@@ -123,9 +123,119 @@ def rref(a, coefficient_columns):
     return rows, pivots, steps
 
 
+def null_basis(reduced, pivots, n):
+    """Una base del núcleo a partir de la RREF de los coeficientes."""
+    basis = []
+    for free in (j for j in range(n) if j not in pivots):
+        v = [Q(0)] * n
+        v[free] = Q(1)
+        for i, pivot in enumerate(pivots):
+            v[pivot] = -reduced[i][free]
+        basis.append(v)
+    return basis
+
+
+def basis_text(basis):
+    return "\n".join(f"v{i+1} = {display(v)}" for i, v in enumerate(basis)) if basis else "Base vacía; el espacio contiene únicamente el vector cero."
+
+
+def determinant(a):
+    """Eliminación sin escalar filas: det(A) = signo · producto de pivotes."""
+    n = len(a)
+    if len(a[0]) != n:
+        raise InputError("El determinante requiere una matriz cuadrada.")
+    rows = [row[:] for row in a]
+    sign, product = 1, Q(1)
+    steps = ["Partir de A y triangular sin escalar filas:\n" + display(a)]
+    for j in range(n):
+        pivot_row = next((i for i in range(j, n) if rows[i][j]), None)
+        if pivot_row is None:
+            steps.append(f"No hay pivote en la columna {j+1}; det(A) = 0.")
+            return Q(0), steps
+        if pivot_row != j:
+            rows[j], rows[pivot_row] = rows[pivot_row], rows[j]
+            sign *= -1
+            steps.append(f"Intercambiar F{j+1} ↔ F{pivot_row+1}: cambia el signo del determinante.\n{display(rows)}")
+        pivot = rows[j][j]
+        product *= pivot
+        for i in range(j+1, n):
+            factor = rows[i][j] / pivot
+            if factor:
+                rows[i] = [x - factor*y for x, y in zip(rows[i], rows[j])]
+                steps.append(f"F{i+1} ← F{i+1} − ({fmt(factor)})·F{j+1}; no cambia el determinante.\n{display(rows)}")
+    value = sign * product
+    steps.append(f"det(A) = ({sign})·" + "·".join(f"({fmt(rows[i][i])})" for i in range(n)) + f" = {fmt(value)}.")
+    return value, steps
+
+
 def calculate(operation, data):
     """Recibe identificador de operación y campos de texto; devuelve un Result."""
     steps = []
+    if operation == "eigen":
+        from .spectral import eigen_result
+        return eigen_result(matrix(data["a"]))
+    if operation == "orthogonality":
+        a, b = vector(data["a"]), vector(data["b"])
+        same_vectors(a, b)
+        dot = sum((x*y for x, y in zip(a, b)), Q(0))
+        steps = ["Evaluar a·b = " + " + ".join(f"({fmt(x)})·({fmt(y)})" for x, y in zip(a, b)) + f" = {fmt(dot)}.",
+                 "Comparar exactamente con cero: " + ("a·b = 0." if dot == 0 else "a·b ≠ 0.")]
+        zero = not any(a) or not any(b)
+        interpretation = ("El vector cero es ortogonal a todo vector según el producto punto, pero no define una dirección ni un ángulo. No puede pertenecer a una base." if zero else
+                          "Los vectores son perpendiculares: su ángulo es 90°. Ser ortogonales no implica tener longitud uno." if dot == 0 else
+                          "Estos vectores no son perpendiculares; no forman un par ortogonal.")
+        return Result("Sí, son ortogonales" if dot == 0 else "No son ortogonales", "Ortogonalidad · comprobación exacta", steps, interpretation)
+    if operation in {"rank", "nullspace", "span_basis", "span_membership"}:
+        a = matrix(data["a"])
+        m, n = len(a), len(a[0])
+        if operation == "span_membership":
+            b = vector(data["b"])
+            if len(b) != m:
+                raise InputError("El vector objetivo debe tener una componente por fila de A; los generadores son sus columnas.")
+            augmented = [row + [target] for row, target in zip(a, b)]
+            reduced, pivots, elimination = rref(augmented, n)
+            steps = ["Buscar coeficientes c tales que Ac = b. Cada columna de A es un generador.\n" + display(augmented)] + elimination
+            if any(not any(row[:n]) and row[n] for row in reduced):
+                return Result("No pertenece al espacio generado", "Pertenencia a span(A)", steps + ["Una fila 0 = c con c ≠ 0 impide representar b."],
+                              "Ninguna combinación lineal de los generadores produce este objetivo. Agregar este vector ampliaría el espacio generado.")
+            coefficients = [Q(0)] * n
+            for i, j in enumerate(pivots):
+                coefficients[j] = reduced[i][n]
+            kernel = null_basis(reduced, pivots, n)
+            steps.append("Una representación, fijando las variables libres en cero: c = " + display(coefficients))
+            steps.append("Verificar Ac = b:\n" + display([row[0] for row in multiply(a, [[x] for x in coefficients])]))
+            if kernel:
+                steps.append("Todas las representaciones: c = c₀ + Σ tᵢvᵢ, con tᵢ reales y:\n" + basis_text(kernel))
+            return Result(coefficients, "Sí pertenece · coeficientes de la combinación", steps,
+                          "Cada coeficiente multiplica la columna correspondiente de A. " + ("La representación no es única; consulta la familia completa en los pasos." if kernel else "La representación es única porque los generadores son independientes."))
+        reduced, pivots, elimination = rref(a, n)
+        rank = len(pivots)
+        steps = ["Reducir A con Gauss–Jordan:\n" + display(a)] + elimination
+        steps.append("Columnas con pivote (numeradas desde 1): " + (", ".join(str(j+1) for j in pivots) or "ninguna") + f". Rango = {rank}.")
+        if operation == "rank":
+            steps.append(f"Rango + nulidad = número de columnas: {rank} + {n-rank} = {n}.")
+            return Result(rank, "Rango de A · dimensión de su imagen", steps,
+                          f"Hay {rank} direcciones de salida independientes en ℝ^{m}. " + ("Las columnas son linealmente independientes." if rank == n else "Las columnas son linealmente dependientes; algunas no aportan direcciones nuevas."))
+        if operation == "span_basis":
+            basis = [[row[j] for row in a] for j in pivots]
+            steps.append("Tomar las columnas con pivote de la matriz ORIGINAL, no de la reducida:\n" + basis_text(basis))
+            return Result(basis, f"Base del espacio generado · dimensión {rank}", steps,
+                          "Cada fila del resultado muestra un vector de la base. " + ("La base es vacía: el espacio generado es {0}. " if not basis else "") +
+                          ("Los generadores son independientes. " if rank == n else "Los generadores son dependientes. ") +
+                          (f"Generan todo ℝ^{m}." if rank == m else f"Generan un subespacio propio de ℝ^{m}."))
+        basis = null_basis(reduced, pivots, n)
+        steps.append("Resolver Ax = 0: elegir una variable libre igual a 1 y las otras a 0 para cada vector de la base.\n" + basis_text(basis))
+        for i, v in enumerate(basis, 1):
+            steps.append(f"Comprobar A·v{i} = " + display([row[0] for row in multiply(a, [[x] for x in v])]))
+        steps.append(f"Rango + nulidad = {rank} + {len(basis)} = {n}.")
+        if basis:
+            steps.append("Todo x del espacio nulo se expresa como x = " + " + ".join(f"t{i+1}·v{i+1}" for i in range(len(basis))) + ", con parámetros reales.")
+        return Result(basis, f"Base del espacio nulo · nulidad {len(basis)}", steps,
+                      "Cada fila del resultado representa un vector de la base del núcleo. " + ("Son direcciones de entrada que A transforma en cero. Si Ax = b tiene una solución x₀, todas son x₀ más un vector de este núcleo." if basis else "La base vacía no contiene al vector cero: el espacio nulo es {0} y tiene dimensión cero."))
+    if operation == "determinant":
+        value, steps = determinant(matrix(data["a"]))
+        return Result(value, "Determinante · cálculo exacto", steps,
+                      "El valor absoluto es el factor de escala de volumen de la transformación. " + ("Al ser cero, A colapsa alguna dirección y no es invertible." if value == 0 else "Al ser distinto de cero, A es invertible. " + ("El signo negativo indica inversión de orientación." if value < 0 else "El signo positivo indica que conserva la orientación.")))
     if operation.startswith("v_"):
         a = vector(data["a"])
         if operation in {"v_add", "v_sub", "v_dot"}:

@@ -12,7 +12,13 @@ O ejecuta desde esta carpeta:
 python app.py
 ```
 
-Se requiere **Python 3.10 o superior con Tkinter/Tcl-Tk**, incluido en la instalación habitual de Python para Windows. No se necesitan paquetes de `pip`, claves de API, conexión a Internet ni servicios de IA. Si Python no está en el PATH, el lanzador también busca `py -3`.
+Se requiere **Python 3.10 o superior con Tkinter/Tcl-Tk**, incluido en la instalación habitual de Python para Windows. El módulo de autovalores/autovectores requiere **NumPy**, ya disponible en el Python de Codex de este equipo. En otro intérprete, instala las dependencias una vez con el mismo Python que abrirá la aplicación:
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+La aplicación funciona localmente, sin claves de API ni servicios de IA. Solo la instalación de dependencias puede necesitar Internet. Si Python no está en el PATH, el lanzador también busca `py -3`. Si falta NumPy, la operación de autovalores muestra cómo instalarlo y las demás operaciones siguen disponibles.
 
 ## Flujo del alumno
 
@@ -32,6 +38,10 @@ La explicación exportada incluye los datos introducidos, el procedimiento, el r
 | Vectores | Suma, resta, multiplicación por escalar, producto punto, norma L₂ |
 | Matrices | Dimensiones, suma, resta, multiplicación por escalar, combinación αA + βB, producto, identidad, transpuesta, inversa |
 | Modelos lineales | Sistemas Ax = b, predicción w·x + b y ajuste de regresión lineal simple |
+| Espacios vectoriales | Espacio generado y base; pertenencia a un espacio; espacio nulo |
+| Ampliación en Matrices | Rango y determinante |
+| Ampliación en Vectores | Ortogonalidad |
+| Espectro de matrices | Autovalores y autovectores |
 
 Los sistemas pueden ser cuadrados o rectangulares. Se identifican soluciones únicas, sistemas incompatibles e infinitas soluciones; estas últimas se expresan con parámetros libres. La inversa se comprueba con A·A⁻¹ = I.
 
@@ -51,6 +61,28 @@ Ejemplo de matriz:
 ```
 
 El motor usa `fractions.Fraction` para conservar resultados racionales exactos, incluso con decimales de entrada. Por ejemplo, `0.1 + 0.2` produce `3/10`. Las normas con raíz no racional se muestran como aproximaciones de ocho cifras significativas.
+
+## Ejercicios complementarios del temario
+
+Se añadieron siete ejercicios con la misma secuencia de definición, parámetros, valores, resultado, pasos, aplicación en IA y pregunta de reflexión. El programa contiene **24 operaciones**; el menú permite desplazarse para acceder a todas.
+
+| Ejercicio nuevo | Entrada de ejemplo | Resultado esperado |
+|---|---|---|
+| Espacio generado y base | A = `1 2 0; 0 0 1` | Base {(1,0), (0,1)}, dimensión 2; generadores dependientes |
+| Pertenencia a un espacio | A = `1 0; 0 1; 1 1`, b = `2 3 5` | Pertenece; coeficientes (2,3) |
+| Rango | A = `1 2 0; 2 4 1; 3 6 1` | Rango 2 |
+| Espacio nulo | A = `1 2 3; 2 4 6` | Base {(-2,1,0), (-3,0,1)}, nulidad 2 |
+| Determinante | A = `2 1 0; 1 3 2; 0 1 4` | Determinante 16 |
+| Ortogonalidad | a = `1 2 -1`, b = `2 -1 0` | Sí; producto punto cero |
+| Autovalores/autovectores | A = `2 1; 1 2` | λ ≈ 1 y 3, con vectores propios unitarios |
+
+En los ejercicios de espacios generados, **cada columna de A es un generador**. Las bases de los resultados se muestran como listas de vectores, uno por fila. La base vacía corresponde al espacio {0}, de dimensión cero. No es una base que contenga el vector cero.
+
+Rango, bases, pertenencia, núcleo, determinante y ortogonalidad se calculan exactamente. Se comprueban las ecuaciones de pertenencia y del núcleo. El determinante se obtiene por eliminación con seguimiento de intercambios de filas; no se confunde el producto de la diagonal de la matriz reducida con el determinante original.
+
+Autovalores/autovectores admite matrices reales cuadradas de hasta 8 × 8. Se obtiene el polinomio característico con coeficientes exactos y se calculan pares propios aproximados en doble precisión. Se admiten salidas complejas y se informa el residuo relativo de cada ecuación Av ≈ λv. Las cifras mostradas se redondean a ocho dígitos significativos; dos valores muy próximos pueden verse iguales. Un residuo pequeño no certifica precisión de autovalores sensibles.
+
+Para matrices simétricas se emplea `numpy.linalg.eigh`; para otras, `numpy.linalg.eig`. En matrices no simétricas, los vectores devueltos pueden ser dependientes y no se presentan como una base completa de cada espacio propio. Se advierte cuando son casi dependientes; no se certifica diagonalización ni multiplicidad exacta. Véanse las referencias oficiales de [eig](https://numpy.org/doc/stable/reference/generated/numpy.linalg.eig.html) y [eigh](https://numpy.org/doc/stable/reference/generated/numpy.linalg.eigh.html).
 
 ## Base en los apuntes
 
@@ -82,11 +114,14 @@ iniciar.bat                Lanzador Windows por doble clic
 iniciar.ps1                Detección del intérprete Python
 matematicas_ia/
     core.py                Validación y motor matemático independiente
+    spectral.py            Polinomio característico exacto y pares propios numéricos
     catalog.py             Definiciones, parámetros, ejemplos y escenarios
     ui.py                  Interfaz de escritorio Tkinter
 tests/
     test_core.py           Casos de apuntes, álgebra y validación
+    test_topics.py         Nuevos temas, invariantes algebraicas y casos límite
     smoke_ui.py            Verificación de interfaz y flujo de todas las operaciones
+requirements.txt           Dependencia del módulo de autovalores/autovectores
 ```
 
 Para incorporar una operación nueva, agrega su definición en `catalog.py`, implementa el cálculo en `core.py` y añade una prueba con un resultado conocido. La interfaz construye los campos a partir del catálogo.
